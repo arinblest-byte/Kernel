@@ -1,8 +1,8 @@
 obj-m += breeze_memk.o
-# Ye line teeno files ko ek saath jodne ke liye hai
 breeze_memk-y := entry.o memory.o process.o
 
-EXTRAVERSION = -android12-9-00019-g4ea09a298bb4-ab12292661
+# Agar KDIR define nahi hai, toh default path (Sirf local testing ke liye)
+KDIR ?= /lib/modules/$(shell uname -r)/build
 
 all:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
