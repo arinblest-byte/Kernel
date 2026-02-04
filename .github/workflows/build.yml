@@ -1,23 +1,58 @@
-name: Build Advance Driver
-on: [push, workflow_dispatch]
+name: Build Breeze Memk Kernel Module
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Tools
-        run: sudo apt-get update && sudo apt-get install -y bc build-essential bison flex libssl-dev libelf-dev clang lld gcc-aarch64-linux-gnu
-      - name: Download GKI
-        run: git clone https://android.googlesource.com/kernel/common -b android12-5.10 --depth 1 kernel-source
-      - name: Build
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Build Dependencies
         run: |
-          cd kernel-source
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 gki_defconfig
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 modules_prepare
-          cd ..
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 KDIR=$GITHUB_WORKSPACE/kernel-source
-      - name: Upload
+          sudo apt-get update
+          sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev \
+          clang llvm lld gcc-aarch64-linux-gnu make
+
+      - name: Setup Kernel Headers (Android GKI)
+        run: |
+          # Android kernel module build karne ke liye headers zaroori hain.
+          # Hum yahan standard linux-headers download kar rahe hain testing ke liye.
+          # Agar aapka koi specific kernel source hai, toh use yahan clone karein.
+          sudo apt-get install -y linux-headers-generic
+          
+          # KDIR set kar rahe hain jo aapke Makefile ko chahiye
+          echo "KDIR=/lib/modules/$(ls /lib/modules | head -n 1)/build" >> $GITHUB_ENV
+
+      - name: Build Module
+        run: |
+          # LLVM=1 se llvm-objdump aur llvm-nm wala error solve hoga
+          # ARCH=arm64 Android ke liye zaroori hai
+          make ARCH=arm64 \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               LLVM=1 \
+               KDIR=${{ env.KDIR }} \
+               -C ${{ env.KDIR }} M=$PWD modules
+
+      - name: Check Build Output
+        run: |
+          if [ -f breeze_memk.ko ]; then
+            echo "Build Successful!"
+            ls -l breeze_memk.ko
+          else
+            echo "Build Failed: breeze_memk.ko not found"
+            exit 1
+          fi
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MemKernelDriver
+          name: breeze_memk_module
           path: breeze_memk.ko
