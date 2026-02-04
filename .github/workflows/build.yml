@@ -3,8 +3,6 @@ name: Build Breeze Memk Kernel Module
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -19,25 +17,21 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev \
-          clang llvm lld gcc-aarch64-linux-gnu make
+          gcc-aarch64-linux-gnu make
 
-      - name: Setup Kernel Headers (Android GKI)
+      - name: Setup Kernel Headers
         run: |
-          # Android kernel module build karne ke liye headers zaroori hain.
-          # Hum yahan standard linux-headers download kar rahe hain testing ke liye.
-          # Agar aapka koi specific kernel source hai, toh use yahan clone karein.
+          # Ubuntu ke headers ARM64 cross-compile ke liye best nahi hote, 
+          # par generic build ke liye hum yahi use karenge.
           sudo apt-get install -y linux-headers-generic
-          
-          # KDIR set kar rahe hain jo aapke Makefile ko chahiye
           echo "KDIR=/lib/modules/$(ls /lib/modules | head -n 1)/build" >> $GITHUB_ENV
 
       - name: Build Module
         run: |
-          # LLVM=1 se llvm-objdump aur llvm-nm wala error solve hoga
-          # ARCH=arm64 Android ke liye zaroori hai
+          # 1. Humne LLVM=1 hata diya hai (Taki -fconserve-stack wala error na aaye)
+          # 2. CROSS_COMPILE ko aarch64-linux-gnu- par set kiya hai
           make ARCH=arm64 \
                CROSS_COMPILE=aarch64-linux-gnu- \
-               LLVM=1 \
                KDIR=${{ env.KDIR }} \
                -C ${{ env.KDIR }} M=$PWD modules
 
@@ -45,7 +39,6 @@ jobs:
         run: |
           if [ -f breeze_memk.ko ]; then
             echo "Build Successful!"
-            ls -l breeze_memk.ko
           else
             echo "Build Failed: breeze_memk.ko not found"
             exit 1
@@ -54,5 +47,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: breeze_memk_module
+          name: breeze_memk_arm64
           path: breeze_memk.ko
