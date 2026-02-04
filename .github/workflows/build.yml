@@ -1,4 +1,4 @@
-name: Build Breeze Memk Kernel Module
+name: Build Android Kernel Module
 
 on:
   push:
@@ -13,39 +13,40 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Build Dependencies
+      - name: Setup Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev \
-          gcc-aarch64-linux-gnu make
+          sudo apt-get install -y bc build-essential flex bison libssl-dev libelf-dev clang llvm lld make git
 
-      - name: Setup Kernel Headers
+      - name: Download Android GKI Kernel Headers
         run: |
-          # Ubuntu ke headers ARM64 cross-compile ke liye best nahi hote, 
-          # par generic build ke liye hum yahi use karenge.
-          sudo apt-get install -y linux-headers-generic
-          echo "KDIR=/lib/modules/$(ls /lib/modules | head -n 1)/build" >> $GITHUB_ENV
+          # Hum Android 12 (5.10 kernel) ke headers download kar rahe hain 
+          # Kyunki aapki EXTRAVERSION mein android12 likha hai.
+          git clone --depth=1 https://github.com/crdroidandroid/android_kernel_google_gs201 -b 12.1 kernel-src
+          echo "KDIR=$GITHUB_WORKSPACE/kernel-src" >> $GITHUB_ENV
 
-      - name: Build Module
+      - name: Build Module (Android Clang)
         run: |
-          # 1. Humne LLVM=1 hata diya hai (Taki -fconserve-stack wala error na aaye)
-          # 2. CROSS_COMPILE ko aarch64-linux-gnu- par set kiya hai
-          make ARCH=arm64 \
+          # Android driver ke liye LLVM=1 aur specific target dena zaroori hai
+          make -C ${{ env.KDIR }} M=$PWD \
+               ARCH=arm64 \
+               LLVM=1 \
+               LLVM_IAS=1 \
                CROSS_COMPILE=aarch64-linux-gnu- \
-               KDIR=${{ env.KDIR }} \
-               -C ${{ env.KDIR }} M=$PWD modules
+               CLANG_TRIPLE=aarch64-linux-gnu- \
+               modules
 
-      - name: Check Build Output
+      - name: Check and Upload
         run: |
           if [ -f breeze_memk.ko ]; then
-            echo "Build Successful!"
+            echo "Build Success!"
           else
-            echo "Build Failed: breeze_memk.ko not found"
+            echo "Build Failed!"
             exit 1
           fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: breeze_memk_arm64
+          name: breeze_memk_android
           path: breeze_memk.ko
