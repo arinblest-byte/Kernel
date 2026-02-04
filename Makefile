@@ -1,15 +1,11 @@
-ifneq ($(KERNELRELEASE),)
-# kbuild part of makefile
-	obj-$(CONFIG_MEMKERNEL)  := memkernel.o
-	memkernel-y := memory.o process.o entry.o
-else
-# normal makefile
-default:
-	# Assume kernel source is at KDIR or fail
-	ifeq ($(KDIR),)
-		$(error KDIR is not set. Please define KDIR to point to the kernel source directory.)
-	endif
-	make -C $(KDIR) M=$(PWD) modules
+obj-m += breeze_memk.o
+# Ye line teeno files ko ek saath jodne ke liye hai
+breeze_memk-y := entry.o memory.o process.o
+
+EXTRAVERSION = -android12-9-00019-g4ea09a298bb4-ab12292661
+
+all:
+	$(MAKE) -C $(KDIR) M=$(PWD) modules
+
 clean:
-	rm -f *.ko *.o *.mod.o *.mod.c *.symvers .*.cmd
-endif
+	$(MAKE) -C $(KDIR) M=$(PWD) clean
